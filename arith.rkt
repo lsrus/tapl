@@ -1,13 +1,16 @@
 #lang racket
 
 (require "parse.rkt")
-(provide -> ->*)
+(provide -> ->* =>)
 
 (define (-> prog) 
   (reduce-term (parse prog)))
 
 (define (->* prog) 
   (evaluate-term (parse prog)))
+  
+(define (=> prog)
+  (big-step (parse prog)))
 
 (define (reduce-term term)
   (match term
@@ -42,7 +45,28 @@
     [`false #t]
     [_ (numeric? term)]))
 
-(define (evaluate-term term)
-  (if (or (value? term))
+(define (big-step term)
+  (if (value? term)
       term
-      (evaluate-term (reduce-term term))))
+      (match term
+        [`(if ,t1 then ,t2 else ,t3)
+         (let [(t1-p (big-step t1))]
+           (cond [(eq? t1-p 'true) (big-step t2)]
+                 [(eq? t1-p 'false) (big-step t3)]
+                 [else (error "Stuck")]))]
+        [`(pred (succ ,t1))
+         (let [(t1-p (big-step t1))]
+           (if (numeric? t1-p)
+               t1-p
+               (error "Stuck")))]
+        [`(pred 0) 0]
+        [`(succ ,t1)
+         (let [(t1-p (big-step t1))]
+           (if (numeric? t1-p)
+               `(succ ,t1-p)
+               (error "Stuck")))]
+        [`(iszero ,t1) 
+         (let [(t1-p (big-step t1))]
+           (cond [(eq? t1-p 0) 'true]
+                 [(numeric? t1-p) 'false]
+                 [else (error "Stuck")]))])))
